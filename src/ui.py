@@ -1,9 +1,11 @@
+import json
 import sys
 from threading import Thread
 import threading
 import vlc
 
 from listener import Listener
+from httpListener import HttpListener
 
 from PySide6.QtWidgets import QApplication
 from PySide6.QtWidgets import (
@@ -24,9 +26,8 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.instance: vlc.Instance = vlc.Instance()
-        self.media: vlc.Media = self.instance.media_new("../assets/test_anuimal.mp4")
+        self.media: vlc.Media | None = None
         self.mediaplayer: vlc.MediaPlayer = self.instance.media_player_new()
-        self.mediaplayer.set_media(self.media)
 
         self._init_ui()
 
@@ -80,18 +81,6 @@ class MainWindow(QMainWindow):
 
         self.group_vlc_frame.setLayout(self.layout_vlc_frame)
 
-    def _play_video(self):
-        rtsp_address: str = self.lineedit_rtsp_address.text()
-        self.media = self.vlc_instance.media_new(rtsp_address)
-        self.vlc_player.set_media(self.media)
-        self.vlc_player.play()
-
-    def _stop_video(self) -> None:
-        pass
-
-    def _record_video(self) -> None:
-        pass
-
     def _init_infomation_group(self) -> None:
         self.group_infomation = QGroupBox("Infomation")
         self.group_infomation.setMaximumHeight(200)
@@ -110,9 +99,9 @@ class MainWindow(QMainWindow):
         self.layout_game_server_port.addWidget(self.lineedit_game_server_port)
 
         self.pushbutton_game_server_link = QPushButton("link")
-        self.pushbutton_game_server_link.clicked.connect(self._link_infomation)
+        self.pushbutton_game_server_link.clicked.connect(self._listen_http)
         self.pushbutton_game_server_close = QPushButton("close")
-        self.pushbutton_game_server_close.clicked.connect(self._close_link)
+        self.pushbutton_game_server_close.clicked.connect(self._stop_http_listening)
         self.layout_game_server_ctrl = QHBoxLayout()
         self.layout_game_server_ctrl.addWidget(self.pushbutton_game_server_close)
         self.layout_game_server_ctrl.addWidget(self.pushbutton_game_server_link)
@@ -124,7 +113,7 @@ class MainWindow(QMainWindow):
 
         self.layout_infomation.addLayout(self.layout_game_server)
 
-        self.label_trial_count = QLabel("Trial number : ")
+        self.label_trial_count = QLabel("Trial count : ")
         self.lineedit_trial_count = QLineEdit()
         self.lineedit_trial_count.setReadOnly(True)
         self.layout_trial_count = QHBoxLayout()
@@ -133,16 +122,16 @@ class MainWindow(QMainWindow):
 
         self.layout_infomation.addLayout(self.layout_trial_count)
 
-        self.label_correct_count = QLabel("Correct number : ")
-        self.lineedit_correct_count = QLineEdit()
-        self.lineedit_correct_count.setReadOnly(True)
-        self.layout_correct_count = QHBoxLayout()
-        self.layout_correct_count.addWidget(self.label_correct_count)
-        self.layout_correct_count.addWidget(self.lineedit_correct_count)
+        # self.label_correct_count = QLabel("Correct number : ")
+        # self.lineedit_correct_count = QLineEdit()
+        # self.lineedit_correct_count.setReadOnly(True)
+        # self.layout_correct_count = QHBoxLayout()
+        # self.layout_correct_count.addWidget(self.label_correct_count)
+        # self.layout_correct_count.addWidget(self.lineedit_correct_count)
 
-        self.layout_infomation.addLayout(self.layout_correct_count)
+        # self.layout_infomation.addLayout(self.layout_correct_count)
 
-        self.label_correct_rate = QLabel("Current correct rate : ")
+        self.label_correct_rate = QLabel("Trial duration : ")
         self.lineedit_correct_rate = QLineEdit()
         self.lineedit_correct_rate.setReadOnly(True)
         self.layout_correct_rate = QHBoxLayout()
@@ -153,14 +142,17 @@ class MainWindow(QMainWindow):
 
         self.group_infomation.setLayout(self.layout_infomation)
 
-    def _init_rtsp_controller(self):
+    def _init_rtsp_controller(self) -> None:
         self.group_rtsp_controller = QGroupBox("Rtsp")
         self.group_rtsp_controller.setMaximumHeight(120)
         self.layout_rtsp_controller = QVBoxLayout()
 
         self.label_rtsp_address = QLabel("RTSP address : ")
-        self.lineedit_rtsp_address = QLineEdit()
+        self.lineedit_rtsp_address = QLineEdit(
+            r"C:\Users\ccccr\repo\projects\academic\psychounity\psychounity_tools_remote_ctrl\assets\test_anuimal.mp4"
+        )
         self.pushbutton_rtsp_address = QPushButton("Link")
+        self.pushbutton_rtsp_address.clicked.connect(self._play_video)
         self.layout_rtsp_address = QHBoxLayout()
         self.layout_rtsp_address.addWidget(self.label_rtsp_address)
         self.layout_rtsp_address.addWidget(self.lineedit_rtsp_address)
@@ -185,13 +177,37 @@ class MainWindow(QMainWindow):
         self._info_thread.join(1)
         print("closed")
 
-    def _update_info(self, trial_count, trial_count_true, correct_rate):
-        self.lineedit_trial_count.setText(str(trial_count))
-        self.lineedit_correct_count.setText(str(trial_count_true))
-        self.lineedit_correct_rate.setText(str(correct_rate))
+    def _listen_http(self) -> None:
+        self._http_listener = HttpListener()
+        self._http_listener_thread = threading.Thread(
+            target=self._http_listener.listening, args=(self._update_info,)
+        )
+        self._http_listener_thread.start()
+
+    def _stop_http_listening(self) -> None:
+        self._http_listener.stop()
+        self._http_listener_thread.join()
+
+    def _update_info(self, data: json):
+        self.lineedit_trial_count.setText(str(data["trialCount"]))
+        self.lineedit_correct_rate.setText(str(data["duration"]))
+
+    def _play_video(self):
+        print("playing")
+        rtsp_address: str = self.lineedit_rtsp_address.text()
+        self.media = self.vlc_instance.media_new(rtsp_address)
+        self.vlc_player.set_media(self.media)
+        self.vlc_player.play()
+
+    def _stop_video(self) -> None:
+        pass
+
+    def _record_video(self) -> None:
+        pass
 
     def __del__(self):
         self._info_thread.join(1)
+        self._stop_http_listening()
 
 
 if __name__ == "__main__":
