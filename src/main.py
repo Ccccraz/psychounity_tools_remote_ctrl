@@ -1,12 +1,18 @@
 import sys
-from ui import MainWindow
+import json
 
 from PySide6 import QtWidgets
 
-if __name__ == "__main__":
-    app = QtWidgets.QApplication(sys.argv)
+from ui.main_view import MainWindow
 
-    window = MainWindow()
-    window.show()
 
-    sys.exit(app.exec())
+with open(r"./src/config/default.json", "r") as file:
+    config = json.load(file)
+
+
+app = QtWidgets.QApplication(sys.argv)
+
+window = MainWindow(config)
+window.show()
+
+sys.exit(app.exec())

@@ -3,7 +3,7 @@ import struct
 import time
 
 
-class Listener:
+class TcpListener:
     def __init__(self, server_ip: str, server_port: int) -> None:
         self._cmd_raw: int = 10
         self._cmd: bytes = self._cmd_raw.to_bytes()
