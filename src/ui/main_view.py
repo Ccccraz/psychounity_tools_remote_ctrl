@@ -1,32 +1,29 @@
 import json
 import sys
-from queue import Queue
-from threading import Thread
-from turtle import st
-from typing import Dict
+from tokenize import group
 
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
     QWidget,
     QVBoxLayout,
+    QHBoxLayout,
     QMenuBar,
     QGroupBox,
+    QPushButton,
 )
 from PySide6.QtGui import QAction, QCloseEvent, QIcon
-from PySide6.QtCore import Slot, Signal
+from PySide6.QtCore import Slot
 
-from ui.rtsp_player import RtspPlayer
 from ui.dialog import RtspDialog, StatusDialog
 from ui.data_table_view import DataTableView
-
-from shared.http_listener import HttpListener
+from ui.gl_video_viewer import GLVideoViewer
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, config: Dict) -> None:
+    def __init__(self, config: dict) -> None:
         super().__init__()
-        self._config: Dict = config
+        self._config: dict = config
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -35,8 +32,11 @@ class MainWindow(QMainWindow):
 
         self.widget_main = QWidget()
         self.layout_main = QVBoxLayout()
+        self.layout_plot_monitor = QHBoxLayout()
+        self.layout_main.addLayout(self.layout_plot_monitor)
 
         self._init_menu()
+        self._init_plot()
         self._init_player()
         self._init_table_view()
 
@@ -72,6 +72,7 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout()
         layout.addWidget(self.data_table)
         group = QGroupBox("Data")
+        group.setMaximumHeight(240)
         group.setLayout(layout)
 
         self.layout_main.addWidget(group)
@@ -81,27 +82,38 @@ class MainWindow(QMainWindow):
         self.data_table.init_listener(address)
 
     def _init_player(self) -> None:
-        self.player = RtspPlayer()
+        self.player = GLVideoViewer()
         layout = QVBoxLayout()
         layout.addWidget(self.player)
         groupbox = QGroupBox("Monitor")
         groupbox.setLayout(layout)
+        groupbox.setMinimumSize(640, 320)
 
-        self.layout_main.addWidget(groupbox)
+        self.layout_plot_monitor.addWidget(groupbox)
 
     @Slot(str)
     def _play_video(self, address: str) -> None:
-        self.player.set_media(address)
+        self.player.load_resource(address)
         self.player.play()
+
+    def _init_plot(self) -> None:
+        groupbox = QGroupBox("Plot")
+        self.layout_plot = QVBoxLayout()
+        groupbox.setLayout(self.layout_plot)
+        groupbox.setMaximumWidth(320)
+        self.pushbutton_add_plot = QPushButton("Add a figure")
+        self.layout_plot.addWidget(self.pushbutton_add_plot)
+        self.layout_plot_monitor.addWidget(groupbox)
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self.data_table.stop()
+        self.player.stop()
         return super().closeEvent(event)
 
 
 if __name__ == "__main__":
     with open(r"../config/default.json", "r") as file:
-        config: Dict = json.load(file)
+        config: dict = json.load(file)
 
     app = QApplication(sys.argv)
 

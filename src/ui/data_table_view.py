@@ -80,15 +80,15 @@ class DataTableView(QWidget):
         self.setLayout(self.layout_main)
 
         self.table = QTableWidget()
-        print(self.table)
         self.table.setRowCount(10)
         self.table.setColumnCount(10)
         self.layout_main.addWidget(self.table)
 
+        self.listener: HttpListener | None = None
+
     def init_listener(self, address) -> None:
         self.data_queue: Queue[dict] = Queue()
         self.listener = HttpListener(address, self.data_queue)
-        print(address)
 
         self.listening_thread = Thread(target=self.listener.listening)
         self.listening_thread.start()
@@ -110,8 +110,9 @@ class DataTableView(QWidget):
     def _update_view(self) -> None:
         self.reading = True
         data = self.data_queue.get()
-        if self.is_init:
+        if self.is_init and data is not None:
             self.data_model.insert_new_data(data)
+            self.table.resizeColumnsToContents()
             self.table.scrollToBottom()
         else:
             self.layout_main.removeWidget(self.table)
@@ -126,11 +127,12 @@ class DataTableView(QWidget):
         self.reading = False
 
     def stop(self) -> None:
-        self.is_running = False
-        self.listener.stop()
-        self.data_queue.put(None)
-        self.listening_thread.join()
-        self.update_thread.join()
+        if self.listener is not None:
+            self.listener.stop()
+            self.is_running = False
+            self.data_queue.put(None)
+            self.listening_thread.join()
+            self.update_thread.join()
 
 
 if __name__ == "__main__":
