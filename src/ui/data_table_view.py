@@ -1,6 +1,8 @@
 from queue import Queue
 import sys
 from threading import Thread
+import time
+from tkinter import W
 from tkinter.messagebox import NO
 from tokenize import Single
 import numpy as np
@@ -70,7 +72,7 @@ class JsonTableModel(QAbstractTableModel):
 
 
 class DataTableView(QWidget):
-    received = Signal(dict)
+    received = Signal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -99,12 +101,15 @@ class DataTableView(QWidget):
 
     def _update_data(self) -> None:
         self.is_running = True
+        self.reading = False
         while self.is_running:
-            data = self.data_queue.get()
-            self.received.emit(data)
+            time.sleep(1)
+            if self.data_queue.empty() is not True and self.reading is not True:
+                self.received.emit()
 
-    @Slot(dict)
-    def _update_view(self, data: dict) -> None:
+    def _update_view(self) -> None:
+        self.reading = True
+        data = self.data_queue.get()
         if self.is_init:
             self.data_model.insert_new_data(data)
             self.table.scrollToBottom()
@@ -117,6 +122,8 @@ class DataTableView(QWidget):
             self.table.setModel(self.data_model)
             self.layout_main.addWidget(self.table)
             self.is_init = True
+
+        self.reading = False
 
     def stop(self) -> None:
         self.is_running = False
