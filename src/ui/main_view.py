@@ -72,6 +72,7 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout()
         layout.addWidget(self.data_table)
         group = QGroupBox("Data")
+        group.setMaximumHeight(240)
         group.setLayout(layout)
 
         self.layout_main.addWidget(group)

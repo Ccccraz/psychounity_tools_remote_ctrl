@@ -23,7 +23,7 @@ class HttpListener:
 
                 data: json = response.json()
                 count = data["trialCount"]
-                if count > previous_count:
+                if count != previous_count:
                     previous_count = count
                     self._queue.put(data)
 
